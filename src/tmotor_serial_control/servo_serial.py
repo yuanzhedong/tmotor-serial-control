@@ -20,8 +20,8 @@ Servo_Params_Serial = {
         'Curr_min' : -15.0,# A (-60A is the acutal limit)
         'Curr_max' : 15.0, # A (60A is the acutal limit)
         'Temp_max' : 40.0, # max mosfet temp in deg C
-        'Kt': 0.115, # Nm befxrgrepore gearbox per A of qaxis current
-        'GEAR_RATIO': 80, # 9:1 gear ratio
+        'Kt': 0.136, # Nm befxrgrepore gearbox per A of qaxis current
+        'GEAR_RATIO': 64, # 9:1 gear ratio
         'NUM_POLE_PAIRS' : 21 # 21 pole pairs
     }        
 }
@@ -176,6 +176,7 @@ def buffer_append_int32(buffer,number):
         Buffer: memory allocated to store data.
         number: value.
     """
+    #breakpoint()
     buffer.append((number >> 24)&(0x000000FF))
     buffer.append((number >> 16)&(0x000000FF))
     buffer.append((number >> 8)&(0x000000FF))
@@ -735,10 +736,12 @@ class TMotorManager():
         """
         Sends the current command that the user has specified.
         """
+        #breakpoint()
         if not (self._command is None):
             # use the thread-safe method to write the command, so that we don't access the serial 
             # object while the reader thread is using it!!
             # TODO when pyserial adds full asyncio support, consider switching to that
+            #breakpoint()
             self._reader_thread.write(self._command)
             
 
@@ -755,7 +758,7 @@ class TMotorManager():
             # TODO when pyserial adds full asyncio support, consider switching to that
             self._reader_thread.write(command)
 
-    def update(self):
+    def update(self, send_cmd=True):
         """
         Synchronizes the current motor state with the asynchronously updated state.
         Sends the current motor command
@@ -771,10 +774,12 @@ class TMotorManager():
             raise RuntimeError("Temperature greater than {}C for device: {}".format(self.max_temp, self.device_info_string()))
 
         # send the user specified command
-        self.send_command()
+        if send_cmd:
+            self.send_command()
 
+        #breakpoint()
         # send the command to get parameters (message will be read in other thread)
-        self._send_specific_command(self.comm_get_motor_parameters())
+        #self._send_specific_command(self.comm_get_motor_parameters())
         
 
         # synchronize user-facing state with most recent async state
@@ -937,13 +942,19 @@ class TMotorManager():
         """
         # 4 byte pos * 1000, 4 byte vel * 1, 4 byte a * 1
         buffer=[]
+        #breakpoint()
+        #breakpoint()
         buffer_append_int32(buffer, int(pos*1000))
         buffer_append_int32(buffer, int(vel))
+        # test acc
+        #acc = 100000
+        print(acc)
         buffer_append_int32(buffer, int(acc))
         data = [COMM_PACKET_ID.COMM_SET_POS_SPD] + buffer
 
         if set_command:
             self._command = bytearray(create_packet(data))
+        #breakpoint()
         return self._command
 
     def comm_set_multi_turn(self, set_command=True):
@@ -1206,9 +1217,13 @@ class TMotorManager():
         if np.abs(vel) >= self.motor_params["V_max"]:
             raise RuntimeError("Cannot control velocities with magnitude greater than " + str(self.motor_params["V_max"]) + "rad/s!")
         
-        pos = (pos / self.rad_per_Eang)
-        vel = (vel / self.radps_per_ERPM)
+        #pos = (pos / self.rad_per_Eang)
+        pos = 360
+        #vel = (vel / self.radps_per_ERPM)
         acc = (acc / self.radps_per_ERPM)
+        vel = 8000
+        acc = 80000
+        
         if self._control_state == SERVO_SERIAL_CONTROL_STATE.POSITION_VELOCITY:
             self.comm_set_position_velocity(pos, vel, acc)
         elif self._control_state == SERVO_SERIAL_CONTROL_STATE.POSITION:
@@ -1239,7 +1254,7 @@ class TMotorManager():
 
     def set_motor_angle_radians(self, pos):
         """
-        Wrapper for set_output_angle that accounts for gear ratio to control motor-side angle
+        Wrapper for set_output_angle that accounts for gear ratio to con<trol motor-side angle
         
         Args:
             pos: The desired motor-side position in rad.
